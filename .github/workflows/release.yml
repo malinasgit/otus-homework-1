@@ -1,0 +1,52 @@
+name: 'C++ CI'
+#Здесь задается имя этого workflow GitHub Actions, которое отображается в интерфейсе GitHub.
+on:
+  push:
+    branches:
+      - master
+      - feature/github_actions
+      - main
+#Этот раздел определяет, когда workflow должен быть запущен. В данном случае, он запускается при каждом push (загрузке) в репозиторий на ветках "main", "master" и "feature/github_actions". Это означает, что workflow будет автоматически запускаться при каждом обновлении кода в этих ветках.
+
+jobs:
+#В этом разделе определяется список задач (jobs), которые выполняются в рамках этого workflow.
+  build:
+  #Это имя задачи, которая выполняет сборку проекта.
+    runs-on: ubuntu-latest
+    #Эта строка указывает, что задача должна выполняться на операционной системе Ubuntu (в последней доступной версии).
+    steps:
+    #Здесь определяются шаги, которые выполняются внутри задачи "build".
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - run: sudo apt-get update && sudo apt-get install libboost-test-dev -y
+      - run: cmake . -DPATCH_VERSION=${{ github.run_number }} -DWITH_BOOST_TEST=ON
+      - run: cmake --build .
+      - run: cmake --build . --target test
+      - run: cmake --build . --target package
+      - name: Create Release
+      #Здесь начинается создание релиза GitHub.
+        id: create_release
+        #Задается идентификатор для созданного релиза.
+        uses: actions/create-release@v1
+        #Этот шаг использует actions для создания релиза. Он предоставляет тег и другую информацию о релизе.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.run_number }}
+          release_name: Release ${{ github.run_number }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+      #Здесь начинается загрузка файла в созданный релиз.
+        id: upload-release-asset
+        #Задается идентификатор для загрузки файла
+        uses: actions/upload-release-asset@v1
+        #Этот шаг использует actions для загрузки файла в релиз. Он указывает путь к файлу, который должен быть загружен, его имя и другие параметры
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./helloworld-0.0.${{ github.run_number }}-Linux.deb
+          asset_name: helloworld-0.0.${{ github.run_number }}-Linux.deb
+          asset_content_type: application/vnd.debian.binary-package
